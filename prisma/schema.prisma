@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Category {
+  WORLD
+  TECHNOLOGY
+  BUSINESS
+  SPORTS
+  ENTERTAINMENT
+  HEALTH
+  SCIENCE
+}
+
+enum RunStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum AlertStatus {
+  ACTIVE
+  PAUSED
+}
+
+model Source {
+  id           String      @id @default(cuid())
+  name         String
+  homeUrl      String
+  feedUrl      String      @unique
+  fetchCount   Int         @default(0)
+  successCount Int         @default(0)
+  errorCount   Int         @default(0)
+  lastFetchedAt DateTime?
+  lastSuccessAt DateTime?
+  lastErrorAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  articles     Article[]
+  sourceRuns   SourceRun[]
+}
+
+model Article {
+  id                 String               @id @default(cuid())
+  title              String
+  slug               String               @unique
+  summary            String
+  content            String?
+  url                String               @unique
+  imageUrl           String?
+  publishedAt        DateTime
+  category           Category
+  sourceId           String
+  topicSignature     String?
+  sourceConfirmCount Int                  @default(1)
+  source             Source               @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  savedBy            SavedArticle[]
+  views              ArticleView[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([category, publishedAt])
+  @@index([publishedAt])
+  @@index([topicSignature, publishedAt])
+}
+
+model IngestionRun {
+  id           String    @id @default(cuid())
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  status       RunStatus
+  totalFetched Int       @default(0)
+  insertedCount Int      @default(0)
+  skippedCount Int       @default(0)
+  errors       String?
+  sourceRuns   SourceRun[]
+}
+
+model SourceRun {
+  id           String       @id @default(cuid())
+  ingestionRunId String
+  sourceId     String
+  startedAt    DateTime     @default(now())
+  finishedAt   DateTime?
+  status       RunStatus
+  fetchedCount Int          @default(0)
+  insertedCount Int         @default(0)
+  skippedCount Int          @default(0)
+  errorMessage String?
+  ingestionRun IngestionRun @relation(fields: [ingestionRunId], references: [id], onDelete: Cascade)
+  source       Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, startedAt])
+  @@index([ingestionRunId, sourceId])
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  sessions     UserSession[]
+  preference   UserPreference?
+  savedArticles SavedArticle[]
+  alerts       KeywordAlert[]
+  views        ArticleView[]
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model UserPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  preferredCategories String   @default("[]")
+  preferredSourceIds  String   @default("[]")
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SavedArticle {
+  id        String   @id @default(cuid())
+  userId    String
+  articleId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId, createdAt])
+}
+
+model ArticleView {
+  id        String   @id @default(cuid())
+  userId    String
+  articleId String
+  viewedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt])
+  @@index([articleId, viewedAt])
+}
+
+model KeywordAlert {
+  id            String      @id @default(cuid())
+  userId        String
+  keyword       String
+  status        AlertStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  lastCheckedAt DateTime?
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, keyword])
+  @@index([userId, status])
+}

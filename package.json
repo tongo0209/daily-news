@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:all": "concurrently -k -n app,ingest -c blue,green \"npm run dev\" \"npm run ingest:watch\"",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
